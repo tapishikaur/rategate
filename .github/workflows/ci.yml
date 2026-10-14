@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: rategate
+          POSTGRES_PASSWORD: rategate
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rategate" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      RATEGATE_TEST_DB: postgres://rategate:rategate@localhost:5432/postgres?sslmode=disable
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Format, vet and test (race detector on)
+        run: |
+          test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+          go vet ./...
+          go test -race -count=1 ./...

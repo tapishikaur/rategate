@@ -1,0 +1,16 @@
+{
+  // GitHub Codespaces (2 cores, 8 GB): Go, Docker (for docker compose, nginx, Prometheus and
+  // k6) and sshd (so `gh codespace ssh` can run the measurement scripts from a terminal).
+  "name": "rategate",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "hostRequirements": { "cpus": 2 },
+  "features": {
+    "ghcr.io/devcontainers/features/go:1": { "version": "1.26" },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/sshd:1": { "version": "latest" }
+  },
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y python3 python3-venv",
+  "customizations": {
+    "vscode": { "extensions": ["golang.go"] }
+  }
+}

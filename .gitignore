@@ -1,0 +1,12 @@
+# Build and test output (scripts/env.sh moves it outside the repo when inside OneDrive)
+.out/
+/rategate
+*.exe
+*.test
+*.out
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

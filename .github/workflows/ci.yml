@@ -31,3 +31,25 @@ jobs:
           test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
           go vet ./...
           go test -race -count=1 ./...
+
+  # The real stack: PostgreSQL, the backend, 2 gateways, nginx and Prometheus. No latency is
+  # measured here: shared CI runners are too noisy for that, and it's done on a fixed machine.
+  compose:
+    runs-on: ubuntu-24.04
+    needs: test
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: The limit is shared across 2 gateways (sync vs local mode)
+        run: |
+          bash scripts/demo.sh "$RUNNER_TEMP/demo.md"
+          cat "$RUNNER_TEMP/demo.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Rejections and latency are exported to Prometheus
+        run: |
+          python3 -I scripts/prom_check.py --out "$RUNNER_TEMP/prometheus.md"
+          cat "$RUNNER_TEMP/prometheus.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --tail 200

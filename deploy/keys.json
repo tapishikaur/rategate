@@ -1,0 +1,9 @@
+{
+  "keys": [
+    {"key": "demo", "rate": 50, "burst": 50}
+  ],
+  "generated": [
+    {"prefix": "oa-", "count": 4, "rate": 100, "burst": 100},
+    {"prefix": "load-", "count": 100, "rate": 1000000, "burst": 1000000}
+  ]
+}

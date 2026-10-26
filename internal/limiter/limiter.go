@@ -194,7 +194,7 @@ func (l *Limiter) Run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			final, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
+			final, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 			l.SyncOnce(final) //nolint:errcheck // already reported through OnStore
 			cancel()
 			return
@@ -234,6 +234,9 @@ func (l *Limiter) SyncOnce(ctx context.Context) error {
 			// reporting everything would put the shared bucket deep in debt and lock the key
 			// out for about as long as the outage lasted. Over-admitting during an outage is
 			// the price of failing open; the cap keeps it from being repaid as an outage.
+			// (If the error came after the database had committed, e.g. a timeout on the
+			// reply, this usage is counted twice. That errs on the strict side: it can only
+			// make the limit tighter for a moment, never let more through.)
 			e.pending = min(e.pending+usage[i].Used, e.limit.Burst)
 			e.touched = true
 		} else if tokens, ok := shared[e.key]; ok {

@@ -1,0 +1,14 @@
+# Prometheus scrapes both gateways' admin ports. 2 s is shorter than usual (15-60 s) so the
+# demo and the checks see changes quickly.
+global:
+  scrape_interval: 2s
+  evaluation_interval: 2s
+
+scrape_configs:
+  - job_name: rategate
+    static_configs:
+      - targets: ["gateway-1:9091", "gateway-2:9091"]
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

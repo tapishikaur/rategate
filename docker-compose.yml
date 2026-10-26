@@ -1,0 +1,94 @@
+# docker compose up --build -d --wait     starts everything:
+#
+#   nginx       :8080 on the host   the load balancer: send requests here, with an X-API-Key
+#   prometheus  :9090 on the host   metrics from both gateways
+#   gateway-1, gateway-2            proxy :8080, admin :9091 (/metrics, /healthz)
+#   backend                         :8081, the test backend (GET /stats for its counts)
+#   postgres                        the shared token buckets
+#
+# The gateways' mode and sync interval come from the environment, e.g.
+#   MODE=exact docker compose up -d --wait gateway-1 gateway-2
+name: rategate
+
+x-app: &app
+  image: rategate:dev
+  build:
+    context: .
+    dockerfile: deploy/Dockerfile
+  restart: unless-stopped
+
+x-gateway: &gateway
+  <<: *app
+  command: ["gateway"]
+  environment:
+    UPSTREAM: http://backend:8081
+    DATABASE_URL: postgres://rategate:rategate@postgres:5432/rategate?sslmode=disable
+    MODE: "${MODE:-sync}"
+    SYNC_INTERVAL: "${SYNC_INTERVAL:-100ms}"
+    CONFIG: /etc/rategate/keys.json
+  volumes:
+    - ./deploy/keys.json:/etc/rategate/keys.json:ro
+  healthcheck:
+    test: ["CMD", "/rategate", "health", "http://localhost:9091/healthz"]
+    interval: 2s
+    timeout: 3s
+    retries: 30
+  depends_on:
+    postgres: { condition: service_healthy }
+    backend: { condition: service_healthy }
+
+services:
+  postgres:
+    image: postgres:18.6-bookworm
+    environment:
+      POSTGRES_USER: rategate
+      POSTGRES_PASSWORD: rategate
+      POSTGRES_DB: rategate
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rategate -d rategate"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  backend:
+    <<: *app
+    command: ["backend"]
+    healthcheck:
+      test: ["CMD", "/rategate", "health", "http://localhost:8081/stats"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  gateway-1: *gateway
+  gateway-2: *gateway
+
+  nginx:
+    image: nginx:1.30.6-alpine3.24
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "8080:8080"
+    healthcheck:
+      # 127.0.0.1, not localhost: nginx listens on IPv4 only.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/nginx-health"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    depends_on:
+      gateway-1: { condition: service_healthy }
+      gateway-2: { condition: service_healthy }
+
+  prometheus:
+    image: prom/prometheus:v3.15.1
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:9090/-/ready"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    depends_on:
+      gateway-1: { condition: service_healthy }
+      gateway-2: { condition: service_healthy }

@@ -60,11 +60,12 @@ func TestTwoGatewaysShareOneLimitThroughPostgres(t *testing.T) {
 		get(t, gateways[i%2].URL, "demo")
 	}
 	got := be.Stats().Keys["demo"]
-	// One bucket would admit exactly 20; two separate limits, 40. The gateway that synced
-	// first after phase 1 holds a count that predates the other's 7 requests until its next
-	// sync, so it can over-spend by at most those 7: no more than 27 in all.
-	if got < 20 || got > 27 {
-		t.Fatalf("the backend saw %d requests, want 20 to 27 (one shared burst), not 40", got)
+	// One bucket would admit exactly 20; two separate limits, 40. Shared, the worst case is 33:
+	// both gateways' views include the 5 tokens left after phase 1, so both may spend them
+	// (5 + 5), and the gateway whose last sync came first may not yet know about up to 8 of
+	// the other's phase-1 requests (+8), until its next sync: 15 + 5 + 5 + 8 = 33.
+	if got < 20 || got > 33 {
+		t.Fatalf("the backend saw %d requests, want 20 to 33 (one shared burst), not 40", got)
 	}
 	// After each gateway's final sync, every admitted request is recorded in the shared
 	// bucket. Wait for those to finish, then sync once more in case one failed (a failed sync
